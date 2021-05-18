@@ -1,17 +1,18 @@
 import 'package:ctm_project/login/sign_up.dart';
+import 'package:ctm_project/main.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:form_field_validator/form_field_validator.dart';
 
-// import 'package:percent_indicator/circular_percent_indicator.dart';
-
-void main() => runApp(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: HomePage(),
-      ),
-    );
-
 class HomePage extends StatelessWidget {
+  final TextEditingController emailTextEditingController =
+      TextEditingController();
+
+  final TextEditingController passwordTextEditingController =
+      TextEditingController();
+
+  static const String idScreen = "Login";
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,6 +64,7 @@ class HomePage extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 15),
                     child: TextFormField(
+                        controller: emailTextEditingController,
                         decoration: InputDecoration(
                             filled: true,
                             fillColor: Color(0xFF4A4A58),
@@ -83,6 +85,7 @@ class HomePage extends StatelessWidget {
                     padding: const EdgeInsets.only(
                         left: 15.0, right: 15.0, top: 15, bottom: 0),
                     child: TextFormField(
+                      controller: passwordTextEditingController,
                       obscureText: true,
                       decoration: InputDecoration(
                           filled: true,
@@ -109,20 +112,18 @@ class HomePage extends StatelessWidget {
                       //validatePassword,        //Function to check validation
                     ),
                   ),
-
-                  // SizedBox(
-                  //   height: 10,
-                  // ),
-
-                  // SizedBox(
-                  //   height: 5,
-                  // ),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Padding(
                       padding: const EdgeInsets.all(5),
                       child: TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => HomePage()),
+                            );
+                          },
                           child: Text(
                             "Forget Password",
                             style:
@@ -135,10 +136,14 @@ class HomePage extends StatelessWidget {
                     // ignore: deprecated_member_use
                     child: RaisedButton(
                       onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => HomePage()),
-                        );
+                        if (!emailTextEditingController.text.contains("@")) {
+                          displayToastMessage("Email is not valid", context);
+                        } else if (passwordTextEditingController.text.isEmpty) {
+                          displayToastMessage(
+                              "Password provide password", context);
+                        } else {
+                          loginAndAuthenticateUser(context);
+                        }
                       },
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(80.0)),
@@ -186,10 +191,8 @@ class HomePage extends StatelessWidget {
                       ],
                     ),
                     onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => SignUp()),
-                      );
+                      Navigator.pushNamedAndRemoveUntil(
+                          context, SignUp.idScreen, (route) => false);
                     },
                   ),
                 ],
@@ -199,5 +202,37 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+
+  loginAndAuthenticateUser(BuildContext context) async {
+    final User firebaseUser = (await _firebaseAuth
+            .createUserWithEmailAndPassword(
+                email: emailTextEditingController.text,
+                password: passwordTextEditingController.text)
+            .catchError((errMsg) {
+      displayToastMessage("Error: " + errMsg.toString(), context);
+    }))
+        .user;
+
+    if (firebaseUser != null) {
+      //save user info to Database
+
+      usersRef.child(firebaseUser.uid).once().then((DataSnapshot snap) {
+        if (snap.value != null) {
+          Navigator.pushNamedAndRemoveUntil(
+              context, HomePage.idScreen, (route) => false);
+          displayToastMessage("You are LOgged in", context);
+        } else {
+          _firebaseAuth.signOut();
+          displayToastMessage(
+              "You Don't have an account.Please create a new account", context);
+        }
+      });
+    } else {
+      displayToastMessage("Error Occured, can not be signed in ", context);
+      //error occured
+    }
   }
 }

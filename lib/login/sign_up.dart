@@ -1,6 +1,9 @@
 import 'package:ctm_project/login/login.dart';
+import 'package:ctm_project/main.dart';
 import 'package:flutter/material.dart';
 import 'package:form_field_validator/form_field_validator.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() => runApp(
       MaterialApp(
@@ -10,6 +13,15 @@ void main() => runApp(
     );
 
 class SignUp extends StatelessWidget {
+  static const String idScreen = "SignUp";
+
+  final TextEditingController nameTextEditingController =
+      TextEditingController();
+  final TextEditingController emailTextEditingController =
+      TextEditingController();
+  final TextEditingController passwordTextEditingController =
+      TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,6 +70,7 @@ class SignUp extends StatelessWidget {
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 5),
                             child: TextFormField(
+                              controller: nameTextEditingController,
                               decoration: InputDecoration(
                                   filled: true,
                                   fillColor: Color(0xFF4A4A58),
@@ -77,6 +90,7 @@ class SignUp extends StatelessWidget {
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 5),
                             child: TextFormField(
+                                controller: emailTextEditingController,
                                 decoration: InputDecoration(
                                     filled: true,
                                     fillColor: Color(0xFF4A4A58),
@@ -102,6 +116,7 @@ class SignUp extends StatelessWidget {
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 5),
                             child: TextFormField(
+                                controller: passwordTextEditingController,
                                 obscureText: true,
                                 decoration: InputDecoration(
                                     filled: true,
@@ -135,11 +150,22 @@ class SignUp extends StatelessWidget {
                             // ignore: deprecated_member_use
                             child: RaisedButton(
                               onPressed: () {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) => HomePage()),
-                                );
+                                if (nameTextEditingController.text.length < 6) {
+                                  displayToastMessage(
+                                      "Name Must Be 5 Character", context);
+                                } else if (!emailTextEditingController.text
+                                    .contains("@")) {
+                                  displayToastMessage(
+                                      "Email is not valid", context);
+                                } else if (passwordTextEditingController
+                                        .text.length <
+                                    7) {
+                                  displayToastMessage(
+                                      "Password must contain 8 latters",
+                                      context);
+                                } else {
+                                  registerNewUser(context);
+                                }
                               },
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(80.0)),
@@ -189,11 +215,8 @@ class SignUp extends StatelessWidget {
                               ],
                             ),
                             onTap: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => HomePage()),
-                              );
+                              Navigator.pushNamedAndRemoveUntil(
+                                  context, HomePage.idScreen, (route) => false);
                             },
                           ),
                         ],
@@ -208,4 +231,35 @@ class SignUp extends StatelessWidget {
       ),
     );
   }
+
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  void registerNewUser(BuildContext context) async {
+    final User firebaseUser = (await _firebaseAuth
+            .createUserWithEmailAndPassword(
+                email: emailTextEditingController.text,
+                password: passwordTextEditingController.text)
+            .catchError((errMsg) {
+      displayToastMessage("Error: " + errMsg.toString(), context);
+    }))
+        .user;
+    if (firebaseUser != null) {
+      //save user info to Database
+
+      Map userDataMap = {
+        "name": nameTextEditingController.text.trim(),
+        "email": emailTextEditingController.text.trim(),
+      };
+      usersRef.child(firebaseUser.uid).set(userDataMap);
+      displayToastMessage("Congratulations", context);
+      Navigator.pushNamedAndRemoveUntil(
+          context, HomePage.idScreen, (route) => false);
+    } else {
+      displayToastMessage("User account has not be created ", context);
+      //error occured
+    }
+  }
+}
+
+displayToastMessage(String message, BuildContext context) {
+  Fluttertoast.showToast(msg: message);
 }
